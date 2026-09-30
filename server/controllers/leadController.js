@@ -286,7 +286,7 @@ const admitStudent = async (req, res) => {
     
     // 2. Check if student with this enrollment number already exists in Fees Management
     // We check this BEFORE creating the LeadAdmission to avoid half-created state if it fails.
-    let feesStudent = await Student.findOne({ studentId: admissionData.enrollmentNo });
+    let feesStudent = await Student.findOne({ studentId: admissionData.enrollmentNo, deletedAt: null });
     let isNewStudent = false;
     
     if (!feesStudent) {
@@ -366,13 +366,6 @@ const admitStudent = async (req, res) => {
              
              if (newFeePlan.paymentPlan === 'FULL_PAYMENT' && advancePaid === totalFees) {
                  paymentType = 'FULL_PAYMENT';
-             } else if (newFeePlan.paymentPlan === 'INSTALLMENT') {
-                 const Installment = require('../models/Installment');
-                 const firstInstallment = await Installment.findOne({ feePlanId: newFeePlan._id }).sort({ installmentNo: 1 });
-                 if (firstInstallment) {
-                    paymentType = 'INSTALLMENT_PAYMENT';
-                    installmentId = firstInstallment._id;
-                 }
              }
 
              const paymentData = {
@@ -518,7 +511,7 @@ const updateAdmittedStudent = async (req, res) => {
     await admission.save();
     
     // Update student record in Fees Management if it exists
-    const feesStudent = await Student.findOne({ studentId: admission.enrollmentNo });
+    const feesStudent = await Student.findOne({ studentId: admission.enrollmentNo, deletedAt: null });
     if (feesStudent) {
       const studentPayload = {
         fullName: admission.fullName,
@@ -540,6 +533,25 @@ const updateAdmittedStudent = async (req, res) => {
       }
       
       await studentService.updateStudent(feesStudent._id, studentPayload, modifierId);
+      
+      // Update Fee Plan and Installments
+      try {
+        const totalFees = Number(admissionData.totalFees) || 0;
+        const advancePaid = Number(admissionData.advancePaid) || 0;
+        const remainingFees = totalFees - advancePaid;
+        
+        const feePlanUpdate = {
+          totalFees: totalFees,
+          paymentPlan: remainingFees === 0 ? 'FULL_PAYMENT' : (admissionData.paymentPlan === 'ONE_TIME' ? 'FULL_PAYMENT' : 'INSTALLMENT'),
+          numberOfInstallments: admissionData.paymentPlan === 'INSTALLMENT' && admissionData.installmentMonths ? parseInt(admissionData.installmentMonths) : (remainingFees > 0 ? 3 : 1),
+          firstDueDate: admissionData.paymentPlan === 'INSTALLMENT' && admissionData.firstEmiDate ? new Date(admissionData.firstEmiDate) : undefined,
+          installments: admissionData.paymentPlan === 'INSTALLMENT' && admissionData.emiSchedule ? admissionData.emiSchedule : undefined,
+        };
+        
+        await feePlanService.updateFeePlan(feesStudent._id, feePlanUpdate, modifierId);
+      } catch (fpErr) {
+        console.warn("Failed to update fee plan during admission edit:", fpErr.message);
+      }
     }
     
     res.status(200).json({ success: true, message: 'Admission updated successfully', data: admission });
@@ -559,6 +571,22 @@ const getAdmittedStudents = async (req, res) => {
   }
 };
 
+const deleteAdmittedStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const admission = await Admission.findByIdAndDelete(id);
+    if (!admission) {
+      return res.status(404).json({ success: false, message: 'Admission not found' });
+    }
+    // Note: This only deletes the Admission record. It does not cascade delete the Student from FeesManagement.
+    // If the user wants that, it would need a call to studentService.removeStudent, but typically we keep the student or soft-delete it separately.
+    res.status(200).json({ success: true, message: 'Admission deleted successfully' });
+  } catch (error) {
+    console.error("❌ Delete Admission Error:", error.message);
+    res.status(500).json({ success: false, message: error.message || "Failed to delete admission" });
+  }
+};
+
 module.exports = {
   createLead,
   getLeads,
@@ -568,4 +596,5 @@ module.exports = {
   admitStudent,
   updateAdmittedStudent,
   getAdmittedStudents,
+  deleteAdmittedStudent,
 };

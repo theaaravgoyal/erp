@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Edit2, User, Phone, BookOpen, Clock, Hash, CreditCard } from 'lucide-react';
+import { Edit2, User, Phone, BookOpen, Clock, Hash, CreditCard, Trash2 } from 'lucide-react';
 
 const STATUS_COLORS = {
   Full: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -23,7 +23,7 @@ function CourseCell({ courses }) {
   );
 }
 
-export default function RegisteredStudents({ students, onEdit, onAddStudent }) {
+export default function RegisteredStudents({ students, onEdit, onDelete, onAddStudent }) {
   if (students.length === 0) {
     return (
       <div className="bg-white border border-[#E8E6E1] rounded-2xl p-16 text-center shadow-sm">
@@ -47,7 +47,7 @@ export default function RegisteredStudents({ students, onEdit, onAddStudent }) {
   return (
     <div className="bg-white border border-[#E8E6E1] rounded-2xl shadow-sm overflow-hidden">
       {/* Table Header */}
-      <div className="grid grid-cols-[2fr_1.2fr_2fr_1.4fr_1.2fr_80px] gap-4 px-6 py-3.5 bg-[#FAFAF9] border-b border-[#E8E6E1]">
+      <div className="grid grid-cols-[2fr_1.2fr_2fr_1.4fr_1.2fr_160px] gap-4 px-6 py-3.5 bg-[#FAFAF9] border-b border-[#E8E6E1]">
         {[
           { icon: User, label: 'Student Name' },
           { icon: Phone, label: 'Contact' },
@@ -68,7 +68,7 @@ export default function RegisteredStudents({ students, onEdit, onAddStudent }) {
         {students.map((student) => (
           <div
             key={student.id}
-            className="grid grid-cols-[2fr_1.2fr_2fr_1.4fr_1.2fr_80px] gap-4 px-6 py-4 hover:bg-[#FAFAF9] transition-colors group items-center"
+            className="grid grid-cols-[2fr_1.2fr_2fr_1.4fr_1.2fr_160px] gap-4 px-6 py-4 hover:bg-[#FAFAF9] transition-colors group items-center"
           >
             {/* Name */}
             <div className="flex items-center gap-3 min-w-0">
@@ -106,13 +106,24 @@ export default function RegisteredStudents({ students, onEdit, onAddStudent }) {
 
             {/* Actions */}
             <div>
-              <button
-                onClick={() => onEdit(student)}
-                className="flex items-center gap-1.5 text-[11px] font-black text-slate-500 hover:text-[#E31C1C] border border-[#E3E1DC] hover:border-[#E31C1C] px-3 py-1.5 rounded-lg transition-all cursor-pointer"
-              >
-                <Edit2 size={11} />
-                Edit
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onEdit(student)}
+                  className="flex items-center gap-1.5 text-[11px] font-black text-slate-500 hover:text-[#E31C1C] border border-[#E3E1DC] hover:border-[#E31C1C] px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  <Edit2 size={11} />
+                  Edit
+                </button>
+                {onDelete && (
+                  <button
+                    onClick={() => onDelete(student.id)}
+                    className="flex items-center gap-1.5 text-[11px] font-black text-slate-500 hover:text-[#E31C1C] border border-[#E3E1DC] hover:border-[#E31C1C] px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                  >
+                    <Trash2 size={11} />
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}

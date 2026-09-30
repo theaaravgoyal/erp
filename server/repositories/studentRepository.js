@@ -11,6 +11,7 @@ class StudentRepository {
    * @param {string|null} excludeId - Exclude target ID from checking (for updates).
    */
   async existsByEmail(email, excludeId = null) {
+    if (!email || !email.trim()) return false;
     const filter = { email: email.trim().toLowerCase(), deletedAt: null };
     if (excludeId) {
       filter._id = { $ne: excludeId };

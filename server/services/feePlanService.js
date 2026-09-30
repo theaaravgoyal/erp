@@ -182,7 +182,15 @@ class FeePlanService {
       await Invoice.deleteMany({ studentId });
 
       if (paymentPlan === 'INSTALLMENT') {
-        const createdInstallments = await installmentService.regenerateInstallments(plan._id, updatedPlan, modifierId);
+        const installmentRepository = require('../repositories/installmentRepository');
+        let createdInstallments;
+        
+        if (updateData.installments && updateData.installments.length > 0) {
+           await installmentRepository.deleteManyByPlan(plan._id);
+           createdInstallments = await installmentService.saveCustomInstallments(updatedPlan, updateData.installments, modifierId);
+        } else {
+           createdInstallments = await installmentService.regenerateInstallments(plan._id, updatedPlan, modifierId);
+        }
         
         // Create fresh invoices
         for (const inst of createdInstallments) {
@@ -206,6 +214,11 @@ class FeePlanService {
           dueDate: firstDueDate || new Date(),
           status: 'PENDING'
         });
+      }
+    } else {
+      if (paymentPlan === 'INSTALLMENT' && updateData.installments && updateData.installments.length > 0) {
+        const installmentService = require('./installmentService');
+        await installmentService.syncCustomInstallments(updatedPlan, updateData.installments, modifierId);
       }
     }
 

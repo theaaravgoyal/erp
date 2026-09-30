@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createLead, getLeads, deleteLead, updateLead, createOfflineLead, admitStudent, updateAdmittedStudent, getAdmittedStudents } = require('../controllers/leadController');
+const { createLead, getLeads, deleteLead, updateLead, createOfflineLead, admitStudent, updateAdmittedStudent, getAdmittedStudents, deleteAdmittedStudent } = require('../controllers/leadController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/uploadMiddleware');
 
@@ -16,6 +16,7 @@ router.post('/', createLead);
 router.post('/offline', protect, createOfflineLead);
 router.post('/admission', protect, admissionUploads, admitStudent);
 router.put('/admission/:id', protect, admissionUploads, updateAdmittedStudent);
+router.delete('/admission/:id', protect, deleteAdmittedStudent);
 router.get('/admissions', protect, getAdmittedStudents);
 router.get('/', protect, getLeads);
 router.delete('/:id', protect, deleteLead);

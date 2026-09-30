@@ -102,14 +102,9 @@ const ManualEnrollment = ({ onNavigate }) => {
 
     const generated = [];
     
-    // Add Admission Deposit if present
-    if (depositNum > 0) {
-      generated.push({
-        name: 'Admission Deposit',
-        amount: depositNum,
-        dueDate: formData.admissionDate
-      });
-    }
+    // In Option 1, we do NOT add Admission Deposit to the installments array.
+    // The admission deposit is handled separately as an INITIAL_PAYMENT.
+    // If the user entered a deposit, the installments will just cover the remaining emiPayable.
 
     if (formData.paymentType === 'One-Time') {
       if (emiPayable > 0 || depositNum === 0) {
@@ -219,7 +214,6 @@ const ManualEnrollment = ({ onNavigate }) => {
     const errors = {};
     if (!formData.name.trim()) errors.name = 'FullName is required';
     if (!formData.phone.trim()) errors.phone = 'Mobile number is required';
-    if (!formData.email.trim()) errors.email = 'Email address is required';
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (formData.email.trim() && !emailRegex.test(formData.email.trim())) {
@@ -235,10 +229,16 @@ const ManualEnrollment = ({ onNavigate }) => {
       errors.course = 'Please select at least one course';
     }
 
-    // Verify installments sum matches Net Total Payable
+    // Verify installments sum matches emiPayable
+    const totalFeeNum = Number(formData.totalFee) || 0;
+    const discountNum = Number(formData.discount) || 0;
+    const depositNum = Number(formData.depositAmount) || 0;
+    const subtotal = Math.max(0, totalFeeNum - discountNum);
+    const emiPayable = Math.max(0, subtotal - depositNum);
+
     const sum = installments.reduce((acc, inst) => acc + (Number(inst.amount) || 0), 0);
-    if (formData.paymentType === 'Installments' && sum !== billingSummary.totalPayable) {
-      errors.installments = `Sum of installments (₹${sum}) must equal Net Total Payable (₹${billingSummary.totalPayable}).`;
+    if (formData.paymentType === 'Installments' && sum !== emiPayable) {
+      errors.installments = `Sum of installments (₹${sum}) must equal Net Installment Balance (₹${emiPayable}).`;
     }
 
     setValidationErrors(errors);
@@ -400,7 +400,7 @@ const ManualEnrollment = ({ onNavigate }) => {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-[10px] uppercase text-slate-400 font-bold">Email Address *</label>
+                <label className="block text-[10px] uppercase text-slate-400 font-bold">Email Address</label>
                 <input 
                   type="email" 
                   name="email" 

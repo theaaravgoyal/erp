@@ -137,6 +137,77 @@ class InstallmentService {
   }
 
   /**
+   * Smartly sync custom installments, retaining payment histories.
+   * @param {Object} feePlan - The parent Fee Plan.
+   * @param {Array<Object>} customInstallments - List of custom installments.
+   * @param {string} modifierId - User ID of staff.
+   */
+  async syncCustomInstallments(feePlan, customInstallments, modifierId) {
+    const existing = await installmentRepository.findByStudentId(feePlan.studentId);
+    
+    // Process each custom installment
+    const result = [];
+    for (let i = 0; i < customInstallments.length; i++) {
+      const customInst = customInstallments[i];
+      const newAmount = Number(customInst.amount);
+      if (newAmount <= 0) continue;
+      
+      const newDueDate = new Date(customInst.dueDate);
+      
+      if (i < existing.length) {
+        // Update existing
+        const inst = existing[i];
+        
+        if (inst.paidAmount > newAmount) {
+           throw new BadRequestError(`Cannot reduce installment #${i+1} amount below its already paid amount (₹${inst.paidAmount}).`);
+        }
+        
+        const remainingAmount = newAmount - inst.paidAmount;
+        let status = 'PENDING';
+        if (remainingAmount === 0) status = 'PAID';
+        else if (inst.paidAmount > 0) status = 'PARTIAL';
+        else if (newDueDate < new Date()) status = 'OVERDUE';
+        
+        const updatedInst = await installmentRepository.update(inst._id, {
+          amount: newAmount,
+          dueDate: newDueDate,
+          remainingAmount,
+          status
+        });
+        result.push(updatedInst);
+      } else {
+        // Create new
+        const newInst = {
+          studentId: feePlan.studentId,
+          feePlanId: feePlan._id,
+          installmentNo: i + 1,
+          amount: newAmount,
+          dueDate: newDueDate,
+          paidAmount: 0,
+          remainingAmount: newAmount,
+          status: newDueDate < new Date() ? 'OVERDUE' : 'PENDING'
+        };
+        const created = await installmentRepository.createMany([newInst]);
+        result.push(created[0]);
+      }
+    }
+    
+    // Remove extra unpaid installments
+    if (existing.length > customInstallments.length) {
+       for (let i = customInstallments.length; i < existing.length; i++) {
+          const inst = existing[i];
+          if (inst.paidAmount > 0) {
+             throw new BadRequestError(`Cannot remove installment #${i+1} because it has payments recorded.`);
+          }
+          const Installment = require('../models/Installment');
+          await Installment.findByIdAndDelete(inst._id);
+       }
+    }
+    
+    return result;
+  }
+
+  /**
    * List active installments of a student profile.
    * Runs the Auto Status Checker and appends dynamic calendar alerts.
    * @param {string} studentId - Student database Object ID.

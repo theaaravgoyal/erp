@@ -162,6 +162,7 @@ export default function AdmissionForm({ onSubmit, editingStudent, onCancel, isSu
   const fileInputRef = useRef(null);
   const idFileInputRef = useRef(null);
   const qualRef = useRef(null);
+  const prevDepsRef = useRef({});
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -248,6 +249,12 @@ export default function AdmissionForm({ onSubmit, editingStudent, onCancel, isSu
   })();
 
   useEffect(() => {
+    const depsKey = `${form.paymentPlan}-${form.totalFees}-${form.advancePaid}-${form.installmentMonths}-${form.firstEmiDate}`;
+    if (prevDepsRef.current.depsKey === depsKey) {
+      return;
+    }
+    prevDepsRef.current.depsKey = depsKey;
+
     if (form.paymentPlan === 'INSTALLMENT' && remaining > 0 && form.installmentMonths && form.firstEmiDate) {
       const months = parseInt(form.installmentMonths, 10);
       if (months > 0) {
@@ -273,12 +280,7 @@ export default function AdmissionForm({ onSubmit, editingStudent, onCancel, isSu
           });
         }
         
-        setForm(f => {
-          if (JSON.stringify(f.emiSchedule) !== JSON.stringify(schedule)) {
-            return { ...f, emiSchedule: schedule };
-          }
-          return f;
-        });
+        setForm(f => ({ ...f, emiSchedule: schedule }));
       }
     } else if (form.emiSchedule.length > 0 && form.paymentPlan !== 'INSTALLMENT') {
       setForm(f => ({ ...f, emiSchedule: [] }));
@@ -310,6 +312,14 @@ export default function AdmissionForm({ onSubmit, editingStudent, onCancel, isSu
     if (!form.manualEnrollmentNo || form.manualEnrollmentNo.trim() === '') {
       alert('Enrollment number is required. Please provide it before submitting.');
       return;
+    }
+    
+    if (form.paymentPlan === 'INSTALLMENT' && form.emiSchedule.length > 0) {
+      const emiTotal = form.emiSchedule.reduce((sum, emi) => sum + (Number(emi.amount) || 0), 0);
+      if (emiTotal !== remaining) {
+        alert(`Total installment amount (₹${emiTotal.toLocaleString('en-IN')}) must equal the remaining balance (₹${remaining.toLocaleString('en-IN')}). Please adjust the installments.`);
+        return;
+      }
     }
 
     onSubmit({
@@ -653,19 +663,54 @@ export default function AdmissionForm({ onSubmit, editingStudent, onCancel, isSu
                       <div className="space-y-2">
                         {form.emiSchedule.map((emi, i) => {
                           const dateObj = new Date(emi.dueDate);
-                          const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
+                          const dateString = isNaN(dateObj) ? '' : `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
                           return (
-                            <div key={i} className="flex justify-between items-center text-xs font-semibold text-slate-600 border-b border-[#F4F4F4] pb-2 last:border-0 last:pb-0">
-                              <span>{i + 1}. {formattedDate}</span>
-                              <span className="font-bold text-slate-800">₹{emi.amount.toLocaleString('en-IN')}</span>
+                            <div key={i} className="flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs font-semibold text-slate-600 border-b border-[#F4F4F4] pb-2 last:border-0 last:pb-0">
+                              <div className="flex items-center gap-2">
+                                <span>{i + 1}.</span>
+                                <div className="w-36">
+                                  <DatePicker 
+                                    value={dateString}
+                                    onChange={(val) => {
+                                      setForm(f => {
+                                        const newSchedule = [...f.emiSchedule];
+                                        newSchedule[i].dueDate = val ? new Date(val).toISOString() : new Date().toISOString();
+                                        return { ...f, emiSchedule: newSchedule };
+                                      });
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="font-bold text-slate-500">₹</span>
+                                <input
+                                  type="number"
+                                  className="border border-[#E3E1DC] rounded px-2 py-1.5 w-24 text-right focus:outline-none focus:border-[#E31C1C] font-bold text-slate-800 bg-white"
+                                  value={emi.amount}
+                                  onChange={(e) => {
+                                    setForm(f => {
+                                      const newSchedule = [...f.emiSchedule];
+                                      newSchedule[i].amount = Number(e.target.value) || 0;
+                                      return { ...f, emiSchedule: newSchedule };
+                                    });
+                                  }}
+                                />
+                              </div>
                             </div>
                           );
                         })}
                       </div>
                       <div className="mt-3 pt-3 border-t border-[#E3E1DC] flex justify-between items-center text-xs">
                         <span className="font-bold text-slate-500">Total Installments: {form.emiSchedule.length}</span>
-                        <span className="font-black text-[#E31C1C]">Total Installment Amount: ₹{form.emiSchedule.reduce((sum, emi) => sum + emi.amount, 0).toLocaleString('en-IN')}</span>
+                        <span className={`font-black ${form.emiSchedule.reduce((sum, emi) => sum + (Number(emi.amount) || 0), 0) !== remaining ? 'text-orange-500' : 'text-[#E31C1C]'}`}>
+                          Total Installment Amount: ₹{form.emiSchedule.reduce((sum, emi) => sum + (Number(emi.amount) || 0), 0).toLocaleString('en-IN')}
+                        </span>
                       </div>
+                      {form.emiSchedule.reduce((sum, emi) => sum + (Number(emi.amount) || 0), 0) !== remaining && (
+                        <p className="text-[10px] text-orange-500 mt-2 font-bold bg-orange-50 p-2 rounded-lg border border-orange-100">
+                          Warning: Total installment amount (₹{form.emiSchedule.reduce((sum, emi) => sum + (Number(emi.amount) || 0), 0).toLocaleString('en-IN')}) does not match the remaining fees balance (₹{remaining.toLocaleString('en-IN')}).
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

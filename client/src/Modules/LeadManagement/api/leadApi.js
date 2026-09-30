@@ -100,5 +100,10 @@ export const leadApi = {
   getAdmittedStudents: async () => {
     const response = await leadAxios.get('/lead/admissions');
     return response.data;
+  },
+
+  deleteAdmittedStudent: async (id) => {
+    const response = await leadAxios.delete(`/lead/admission/${id}`);
+    return response.data;
   }
 };

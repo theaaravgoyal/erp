@@ -66,12 +66,12 @@ const StudentSchema = new mongoose.Schema(
     // Unique contact email address with email format validation
     email: {
       type: String,
-      required: [true, 'Email address is required'],
-      unique: true,
       trim: true,
       lowercase: true,
+      sparse: true,
       validate: {
         validator: function (v) {
+          if (!v) return true; // Optional
           return /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(v);
         },
         message: (props) => `${props.value} is not a valid email address!`,

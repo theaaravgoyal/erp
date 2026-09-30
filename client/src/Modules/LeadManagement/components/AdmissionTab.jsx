@@ -75,6 +75,22 @@ export default function AdmissionTab() {
     setNestedTab('registered-students');
   };
 
+  const handleDeleteStudent = async (studentId) => {
+    if (!window.confirm("Are you sure you want to delete this admission record?")) return;
+    try {
+      const response = await leadApi.deleteAdmittedStudent(studentId);
+      if (response && response.success) {
+        setRegisteredStudents(prev => prev.filter(s => s.id !== studentId));
+        alert('Admission record deleted successfully!');
+      } else {
+        alert('Failed to delete student: ' + (response?.message || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error deleting admission: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Nested Tabs */}
@@ -126,6 +142,7 @@ export default function AdmissionTab() {
         <RegisteredStudents
           students={registeredStudents}
           onEdit={handleEditStudent}
+          onDelete={handleDeleteStudent}
           onAddStudent={() => {
             setNestedTab('new-admission');
             setEditingStudent(null);
